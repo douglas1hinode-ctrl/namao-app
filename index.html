@@ -141,6 +141,10 @@ const state = { user:null, view:"home", clientes:[], emprestimos:[], ciclos:[], 
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
 const money = v => "R$ " + Number(v||0).toLocaleString("pt-BR",{minimumFractionDigits:2, maximumFractionDigits:2});
+function parseNum(v){ if(v==null) return 0; let s=String(v).trim().replace(/[^\d.,-]/g,"");
+  if(s.indexOf(",")>-1 && s.indexOf(".")>-1){ s=s.replace(/\./g,"").replace(",","."); }
+  else if(s.indexOf(",")>-1){ s=s.replace(",","."); }
+  const n=Number(s); return isNaN(n)?0:n; }
 function todayISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 function parseD(s){ return new Date(s+"T00:00:00"); }
 function addDays(iso,n){ const d=parseD(iso); d.setDate(d.getDate()+n); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
@@ -235,9 +239,10 @@ function render(){
   if(state.view==="home") renderHome(scr,fab);
   else if(state.view==="novo") renderNovo(scr,fab);
   else if(state.view==="cliente") renderCliente(scr,fab);
+  else if(state.view==="editar") renderEditar(scr,fab);
   else if(state.view==="config") renderConfig(scr,fab);
 }
-function titleFor(v){ return v==="novo"?"Novo empréstimo":v==="cliente"?"Ficha":v==="config"?"Ajustes":""; }
+function titleFor(v){ return v==="novo"?"Novo empréstimo":v==="cliente"?"Ficha":v==="editar"?"Editar empréstimo":v==="config"?"Ajustes":""; }
 
 // ---------- HOME ----------
 function renderHome(scr,fab){
@@ -289,12 +294,15 @@ function renderNovo(scr,fab){
     <div class="field"><label>Valor emprestado (principal)</label><input id="f-principal" inputmode="decimal" placeholder="Ex: 500"></div>
     <div class="field"><label>Juro por período (R$)</label><input id="f-juro" inputmode="decimal" placeholder="Ex: 150"></div>
     <div class="field"><label>Período em dias</label><input id="f-periodo" inputmode="numeric" value="15">
-      <div class="hint">De quantos em quantos dias entra o juro (ajuste por cliente).</div>
+      <div class="hint">De quantos em quantos dias entra o juro (14, 15, 30... o que for).</div>
+    </div>
+    <div class="field"><label>Data de início</label><input id="f-data" type="date" value="${todayISO()}">
+      <div class="hint">Quando o empréstimo começou. O 1º juro vence nessa data + o período.</div>
     </div>
     <div class="result" id="f-result"></div>`;
   const sel=$("f-cliente"), nc=$("f-novoc");
   sel.onchange=()=>{ nc.classList.toggle("hide", sel.value!==""); };
-  const upd=()=>{ const p=Number($("f-principal").value||0), j=Number($("f-juro").value||0), d=Number($("f-periodo").value||15);
+  const upd=()=>{ const p=parseNum($("f-principal").value), j=parseNum($("f-juro").value), d=Math.round(parseNum($("f-periodo").value))||15;
     $("f-result").textContent = p>0&&j>0 ? `${money(p)} na rua · juro de ${money(j)} a cada ${d} dias` : "Preencha o valor e o juro."; };
   ["f-principal","f-juro","f-periodo"].forEach(i=>$(i).addEventListener("input",upd)); upd();
   fab.innerHTML=`<button class="btn gold" id="f-salvar">Confirmar empréstimo</button>`;
@@ -302,19 +310,22 @@ function renderNovo(scr,fab){
 }
 async function salvarEmprestimo(){
   const sel=$("f-cliente").value;
-  const principal=Number($("f-principal").value||0), juro=Number($("f-juro").value||0), periodo=Number($("f-periodo").value||15);
-  if(!(principal>0)||!(juro>0)||!(periodo>0)){ toast("Preencha valor, juro e período."); return; }
+  const principal=parseNum($("f-principal").value), juro=parseNum($("f-juro").value), periodo=Math.round(parseNum($("f-periodo").value));
+  const dataInicio=$("f-data").value||todayISO();
+  if(!(principal>0)){ toast("Digite o valor emprestado."); return; }
+  if(!(juro>0)){ toast("Digite o juro."); return; }
+  if(!(periodo>0)){ toast("Digite o período em dias (ex: 14)."); return; }
   let clienteId=sel;
   if(!clienteId){
     const nome=($("f-nome").value||"").trim(); if(!nome){ toast("Digite o nome do cliente."); return; }
     const { data, error }=await sb.from("clientes").insert({ nome, telefone:($("f-tel").value||"").trim()||null }).select().single();
-    if(error){ toast("Erro ao criar cliente."); return; } clienteId=data.id;
+    if(error){ toast("Erro ao criar cliente: "+(error.message||"")); return; } clienteId=data.id;
   }
   const { data:emp, error }=await sb.from("emprestimos").insert({
-    cliente_id:clienteId, principal, juro_valor:juro, periodo_dias:periodo, data_inicio:todayISO(), status:"ativo"
+    cliente_id:clienteId, principal, juro_valor:juro, periodo_dias:periodo, data_inicio:dataInicio, status:"ativo"
   }).select().single();
-  if(error){ toast("Erro ao salvar empréstimo."); return; }
-  await sb.from("ciclos").insert({ emprestimo_id:emp.id, numero:1, vencimento:addDays(todayISO(),periodo), juro_previsto:juro, status:"aberto" });
+  if(error){ toast("Erro ao salvar: "+(error.message||"")); return; }
+  await sb.from("ciclos").insert({ emprestimo_id:emp.id, numero:1, vencimento:addDays(dataInicio,periodo), juro_previsto:juro, status:"aberto" });
   await loadData();
   toast("Empréstimo lançado!"); go("cliente", clienteId);
 }
@@ -355,7 +366,10 @@ function renderCliente(scr,fab){
     }
     html+=`</div>`;
     if(e.status==="ativo"){
-      html+=`<div style="margin-top:10px"><button class="btn ghost" onclick="receberPrincipal('${e.id}')">Recebi de volta o dinheiro (abater/quitar)</button></div>`;
+      html+=`<div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn ghost" style="flex:1 1 140px" onclick="receberPrincipal('${e.id}')">Recebi o dinheiro (quitar)</button>
+        <button class="btn ghost" style="flex:1 1 100px" onclick="editarEmprestimo('${e.id}')">Editar</button>
+      </div>`;
     }
   }
   scr.innerHTML=html;
@@ -380,6 +394,33 @@ async function receberPrincipal(empId){
   if(quitou) go("home"); else render();
 }
 
+// ---------- EDITAR EMPRÉSTIMO ----------
+function editarEmprestimo(empId){ state.editId=empId; go("editar"); }
+function renderEditar(scr,fab){
+  const e=state.emprestimos.find(x=>x.id===state.editId); if(!e){ go("home"); return; }
+  const cli=state.clientes.find(c=>c.id===e.cliente_id);
+  scr.innerHTML=`
+    <div style="font-size:13px;color:var(--soft);margin-bottom:8px">Empréstimo de <b style="color:var(--ink)">${esc(cli?cli.nome:"")}</b></div>
+    <div class="field"><label>Valor emprestado (principal)</label><input id="e-principal" inputmode="decimal" value="${e.principal}"></div>
+    <div class="field"><label>Juro por período (R$)</label><input id="e-juro" inputmode="decimal" value="${empJuro(e)}"></div>
+    <div class="field"><label>Período em dias</label><input id="e-periodo" inputmode="numeric" value="${e.periodo_dias}"></div>
+    <div class="field"><label>Data de início</label><input id="e-data" type="date" value="${e.data_inicio}">
+      <div class="hint">Muda quando começou / quando cai o próximo juro.</div>
+    </div>
+    <div class="hint" style="margin-top:10px">Ao salvar, os juros ainda não pagos são recalculados com os novos valores. Os que já foram pagos ficam como estão.</div>`;
+  fab.innerHTML=`<button class="btn gold" id="e-salvar">Salvar alterações</button>`;
+  $("e-salvar").onclick=()=>salvarEdicao(e.id, e.cliente_id);
+}
+async function salvarEdicao(empId, clienteId){
+  const principal=parseNum($("e-principal").value), juro=parseNum($("e-juro").value), periodo=Math.round(parseNum($("e-periodo").value)), data=$("e-data").value||todayISO();
+  if(!(principal>0)||!(juro>0)||!(periodo>0)){ toast("Preencha valor, juro e período."); return; }
+  const { error }=await sb.from("emprestimos").update({ principal, juro_valor:juro, juro_percent:null, periodo_dias:periodo, data_inicio:data }).eq("id",empId);
+  if(error){ toast("Erro ao salvar: "+(error.message||"")); return; }
+  await sb.from("ciclos").delete().eq("emprestimo_id",empId).neq("status","pago");
+  await loadData(); await ensureCiclos(); await loadData();
+  toast("Empréstimo atualizado!"); go("cliente", clienteId);
+}
+
 // ---------- CONFIG ----------
 function renderConfig(scr,fab){
   const cfg=state.cfg||{};
@@ -401,7 +442,7 @@ async function loadCfg(){ const { data }=await sb.from("config").select("*").eq(
 
 // ---------- util ----------
 function esc(s){ return String(s||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
-window.go=go; window.receberJuro=receberJuro; window.receberPrincipal=receberPrincipal;
+window.go=go; window.receberJuro=receberJuro; window.receberPrincipal=receberPrincipal; window.editarEmprestimo=editarEmprestimo;
 
 $("lg-btn").onclick=doLogin;
 $("lg-pass").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
