@@ -160,6 +160,7 @@ async function doLogin(){
   state.user=data.user; $("login").classList.add("hide"); showApp();
 }
 async function showApp(){
+  if(state.shownApp) return; state.shownApp=true;
   $("app").classList.remove("hide");
   await loadData();
   await ensureCiclos();
@@ -399,6 +400,7 @@ window.go=go; window.receberJuro=receberJuro; window.receberPrincipal=receberPri
 
 $("lg-btn").onclick=doLogin;
 $("lg-pass").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
+sb.auth.onAuthStateChange((_e, session)=>{ if(session){ state.user=session.user; $("login").classList.add("hide"); showApp(); } });
 boot();
 </script>
 </body>
