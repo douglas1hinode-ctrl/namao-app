@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#123f2b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Na Mão">
+<title>Na Mão — Controle</title>
+<style>
+  :root{
+    --pine:#123f2b; --pine-deep:#0b2c1e; --gold:#d6a53a; --paper:#eef1ea;
+    --card:#ffffff; --ink:#16211b; --soft:#5b675c; --line:#dde2d7;
+    --danger:#c23b28; --warn:#a9761a; --ok:#2f7d53;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--paper); color:var(--ink); font-family:var(--font); -webkit-font-smoothing:antialiased;
+    padding-bottom:env(safe-area-inset-bottom)}
+  .num{font-variant-numeric:tabular-nums}
+  button{font-family:inherit; cursor:pointer}
+  input,select{font-family:inherit; font-size:16px}
+  .hide{display:none !important}
+
+  /* topbar */
+  .top{position:sticky; top:0; z-index:5; background:linear-gradient(150deg,var(--pine),var(--pine-deep));
+    color:#eef3ec; padding:calc(14px + env(safe-area-inset-top)) 18px 14px; display:flex; align-items:center; gap:10px}
+  .top .brand{font-weight:800; letter-spacing:-.02em; font-size:19px}
+  .top .brand span{color:var(--gold)}
+  .top .sp{flex:1}
+  .icobtn{background:rgba(255,255,255,.12); border:none; color:#eef3ec; width:38px; height:38px; border-radius:11px; font-size:17px}
+  .back{background:none; border:none; color:#eef3ec; font-size:16px; font-weight:700; padding:0; display:flex; align-items:center; gap:6px}
+
+  .wrap{max-width:560px; margin:0 auto; padding:16px 16px 90px}
+
+  /* cards */
+  .rua{background:linear-gradient(150deg,var(--pine),var(--pine-deep)); color:#eaf2e9; border-radius:18px; padding:18px 20px}
+  .rua .lbl{font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#a9c8b3}
+  .rua .val{font-size:34px; font-weight:800; letter-spacing:-.02em; margin-top:3px}
+  .rua .sub{font-size:12.5px; color:#bcd3c1; margin-top:4px}
+  .mrow{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px}
+  .mini{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px}
+  .mini .t{font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--soft)}
+  .mini .n{font-size:20px; font-weight:800; margin-top:2px}
+  .mini.red{background:#fbecea; border-color:#f2cfc9} .mini.red .t{color:var(--danger)} .mini.red .n{color:#a32e1e}
+  .mini.amber{background:#fbf2e0; border-color:#efdcb3} .mini.amber .t{color:var(--warn)} .mini.amber .n{color:#8a6011}
+
+  .sec-t{font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--soft); margin:20px 4px 8px}
+  .list{background:var(--card); border:1px solid var(--line); border-radius:16px; overflow:hidden}
+  .row{display:flex; align-items:center; gap:12px; padding:13px 15px; border-bottom:1px solid var(--line); width:100%; background:none; border-left:0; border-right:0; border-top:0; text-align:left}
+  .row:last-child{border-bottom:none}
+  .ava{width:38px; height:38px; border-radius:50%; flex:0 0 auto; background:#dfe7df; color:#3f6b4f; font-weight:800; display:flex; align-items:center; justify-content:center}
+  .row .nm{font-weight:700; font-size:15px}
+  .row .meta{font-size:12.5px; color:var(--soft); margin-top:1px}
+  .row .amt{margin-left:auto; text-align:right}
+  .row .amt .v{font-weight:800; font-size:15px}
+  .pill{font-size:10.5px; font-weight:800; padding:2px 8px; border-radius:999px; display:inline-block; margin-top:2px}
+  .pill.red{background:#f6d9d3; color:#a32e1e} .pill.amber{background:#f4e4bf; color:#8a6011} .pill.ok{background:#d5ead9; color:#256a44}
+  .empty{color:var(--soft); text-align:center; padding:26px 10px; font-size:14px}
+
+  /* forms */
+  .field{margin-top:12px}
+  .field label{display:block; font-size:12px; letter-spacing:.05em; text-transform:uppercase; color:var(--soft); margin-bottom:5px; font-weight:700}
+  .field input, .field select{width:100%; padding:13px 14px; border:1px solid var(--line); border-radius:12px; background:var(--card); color:var(--ink)}
+  .field .hint{font-size:12px; color:var(--soft); margin-top:5px}
+  .result{margin-top:14px; background:#fbf3df; border:1px solid #e7c877; border-radius:12px; padding:12px 14px; color:#8a6011; font-weight:700}
+
+  .btn{display:block; width:100%; text-align:center; border:none; border-radius:14px; padding:15px; font-weight:800; font-size:16px}
+  .btn.gold{background:var(--gold); color:#241a00}
+  .btn.pine{background:var(--pine); color:#eaf2e9}
+  .btn.ghost{background:var(--card); color:var(--ink); border:1px solid var(--line)}
+  .btn.danger{background:#fbecea; color:#a32e1e; border:1px solid #f2cfc9}
+  .btn + .btn{margin-top:10px}
+
+  /* FAB bar */
+  .fabbar{position:fixed; left:0; right:0; bottom:0; background:linear-gradient(to top, var(--paper) 70%, transparent);
+    padding:12px 16px calc(12px + env(safe-area-inset-bottom)); max-width:560px; margin:0 auto}
+
+  /* login */
+  .login{min-height:100vh; display:flex; flex-direction:column; justify-content:center; padding:24px;
+    background:linear-gradient(150deg,var(--pine),var(--pine-deep)); color:#eef3ec}
+  .login .lg-brand{font-size:40px; font-weight:800; letter-spacing:-.04em}
+  .login .lg-brand span{color:var(--gold)}
+  .login .lg-tag{font-style:italic; color:var(--gold); margin-bottom:26px; font-family:Georgia,serif}
+  .login .field label{color:#a9c8b3}
+  .login .field input{background:rgba(255,255,255,.1); border-color:rgba(236,208,138,.4); color:#fff}
+  .login .err{color:#ffd0c8; font-size:13px; margin-top:12px; min-height:16px}
+
+  .toast{position:fixed; left:50%; bottom:90px; transform:translateX(-50%); background:var(--ink); color:#fff;
+    padding:11px 18px; border-radius:12px; font-size:14px; font-weight:600; z-index:20; opacity:0; transition:opacity .2s; pointer-events:none}
+  .toast.on{opacity:1}
+  .ciclo{display:flex; align-items:center; gap:11px; padding:12px 0; border-bottom:1px solid var(--line)}
+  .ciclo:last-child{border-bottom:none}
+  .ciclo .ic{width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px; flex:0 0 auto}
+  .ic.ok{background:#d5ead9; color:#256a44} .ic.amber{background:#f4e4bf; color:#8a6011} .ic.red{background:#f6d9d3; color:#a32e1e}
+  .ciclo .cl{flex:1} .ciclo .ck{font-weight:700; font-size:14px} .ciclo .cd{font-size:12px; color:var(--soft)}
+  .ciclo .cv{font-weight:800; font-variant-numeric:tabular-nums}
+  .mini-btn{background:var(--pine); color:#eaf2e9; border:none; border-radius:9px; padding:7px 11px; font-weight:700; font-size:12.5px; margin-left:8px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login" class="login hide">
+  <div class="lg-brand">Na <span>Mão</span></div>
+  <div class="lg-tag">seu controle, na sua mão.</div>
+  <div class="field"><label>E-mail</label><input id="lg-email" type="email" autocomplete="username" placeholder="seu e-mail"></div>
+  <div class="field"><label>Senha</label><input id="lg-pass" type="password" autocomplete="current-password" placeholder="sua senha"></div>
+  <div class="err" id="lg-err"></div>
+  <div style="margin-top:18px"><button class="btn gold" id="lg-btn">Entrar</button></div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hide">
+  <div class="top">
+    <button class="back hide" id="btn-back">‹ Voltar</button>
+    <div class="brand" id="top-title">Na <span>Mão</span></div>
+    <div class="sp"></div>
+    <button class="icobtn" id="btn-config" title="Configurações">⚙</button>
+  </div>
+  <div class="wrap" id="screen"></div>
+  <div class="fabbar" id="fabbar"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+const SUPABASE_URL = "https://efmsswuzjfmpfzfimrpc.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmbXNzd3V6amZtcGZ6ZmltcnBjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwNzcwMzksImV4cCI6MjA5ODY1MzAzOX0.hv9WOBiIJRSk5yF8mzJwdRjzGYeyxHXHrMgAg695LS8";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+const state = { user:null, view:"home", clientes:[], emprestimos:[], ciclos:[], pagamentos:[], sel:null };
+
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+const money = v => "R$ " + Number(v||0).toLocaleString("pt-BR",{minimumFractionDigits:2, maximumFractionDigits:2});
+function todayISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function parseD(s){ return new Date(s+"T00:00:00"); }
+function addDays(iso,n){ const d=parseD(iso); d.setDate(d.getDate()+n); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function daysBetween(a,b){ return Math.floor((parseD(b)-parseD(a))/86400000); }
+function fmtBR(iso){ const d=parseD(iso); return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0"); }
+function initials(n){ return (n||"?").trim().charAt(0).toUpperCase(); }
+function empJuro(e){ return e.juro_valor!=null ? Number(e.juro_valor) : Number(e.principal)*Number(e.juro_percent||0)/100; }
+let toastT;
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("on"),1800); }
+
+// ---------- auth ----------
+async function boot(){
+  const { data } = await sb.auth.getSession();
+  if(data.session){ state.user=data.session.user; showApp(); }
+  else { $("login").classList.remove("hide"); }
+}
+async function doLogin(){
+  $("lg-err").textContent="";
+  const email=$("lg-email").value.trim(), pass=$("lg-pass").value;
+  const { data, error } = await sb.auth.signInWithPassword({ email, password:pass });
+  if(error){ $("lg-err").textContent="E-mail ou senha incorretos."; return; }
+  state.user=data.user; $("login").classList.add("hide"); showApp();
+}
+async function showApp(){
+  $("app").classList.remove("hide");
+  await loadData();
+  await ensureCiclos();
+  await loadData();
+  await loadCfg();
+  go("home");
+}
+
+// ---------- data ----------
+async function loadData(){
+  const [c,e,ci,p] = await Promise.all([
+    sb.from("clientes").select("*").order("nome"),
+    sb.from("emprestimos").select("*"),
+    sb.from("ciclos").select("*"),
+    sb.from("pagamentos").select("*"),
+  ]);
+  state.clientes=c.data||[]; state.emprestimos=e.data||[]; state.ciclos=ci.data||[]; state.pagamentos=p.data||[];
+}
+async function ensureCiclos(){
+  const today=todayISO(); const toInsert=[];
+  for(const emp of state.emprestimos.filter(x=>x.status==="ativo")){
+    const cs=state.ciclos.filter(c=>c.emprestimo_id===emp.id);
+    const last=cs.reduce((m,c)=>Math.max(m,c.numero),0);
+    const periodsDue=Math.floor(daysBetween(emp.data_inicio,today)/emp.periodo_dias);
+    const target=periodsDue+1;
+    const juro=empJuro(emp);
+    for(let n=last+1; n<=target && n<=last+200; n++){
+      toInsert.push({ emprestimo_id:emp.id, numero:n, vencimento:addDays(emp.data_inicio, n*emp.periodo_dias), juro_previsto:juro, status:"aberto" });
+    }
+  }
+  if(toInsert.length) await sb.from("ciclos").insert(toInsert);
+  // vencidos e não pagos -> atrasado
+  await sb.from("ciclos").update({status:"atrasado"}).lt("vencimento",today).eq("status","aberto");
+}
+
+// derived
+function loansOf(clienteId){ return state.emprestimos.filter(e=>e.cliente_id===clienteId); }
+function ciclosOf(empId){ return state.ciclos.filter(c=>c.emprestimo_id===empId).sort((a,b)=>a.numero-b.numero); }
+function jurosAbertosEmp(empId){ return ciclosOf(empId).filter(c=>c.status!=="pago").reduce((s,c)=>s+(Number(c.juro_previsto)-Number(c.juro_pago)),0); }
+function saldoCliente(clienteId){
+  return loansOf(clienteId).filter(e=>e.status==="ativo")
+    .reduce((s,e)=> s + Number(e.principal) + jurosAbertosEmp(e.id), 0);
+}
+function totalNaRua(){ return state.emprestimos.filter(e=>e.status==="ativo").reduce((s,e)=>s+Number(e.principal),0); }
+function recebidoMes(){
+  const now=new Date(), ym=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+  return state.pagamentos.filter(p=>(p.data||"").startsWith(ym)).reduce((s,p)=>s+Number(p.valor),0);
+}
+function ciclosStatus(st){ // 'atrasado' | 'hoje'
+  const today=todayISO();
+  if(st==="hoje") return state.ciclos.filter(c=>c.status!=="pago" && c.vencimento===today);
+  return state.ciclos.filter(c=>c.status==="atrasado");
+}
+
+// ---------- navigation ----------
+function go(view, sel){ state.view=view; state.sel=sel!==undefined?sel:state.sel; render(); }
+$("btn-back").onclick=()=>go("home");
+$("btn-config").onclick=()=>go("config");
+
+function render(){
+  const back=$("btn-back"), title=$("top-title"), fab=$("fabbar"), scr=$("screen");
+  fab.innerHTML=""; scr.scrollTop=0;
+  const atHome = state.view==="home";
+  back.classList.toggle("hide", atHome);
+  $("btn-config").classList.toggle("hide", !atHome);
+  title.innerHTML = atHome ? 'Na <span style="color:var(--gold)">Mão</span>' : titleFor(state.view);
+  if(state.view==="home") renderHome(scr,fab);
+  else if(state.view==="novo") renderNovo(scr,fab);
+  else if(state.view==="cliente") renderCliente(scr,fab);
+  else if(state.view==="config") renderConfig(scr,fab);
+}
+function titleFor(v){ return v==="novo"?"Novo empréstimo":v==="cliente"?"Ficha":v==="config"?"Ajustes":""; }
+
+// ---------- HOME ----------
+function renderHome(scr,fab){
+  const atras=ciclosStatus("atrasado"), hoje=ciclosStatus("hoje");
+  const somaAtras=atras.reduce((s,c)=>s+(Number(c.juro_previsto)-Number(c.juro_pago)),0);
+  const somaHoje=hoje.reduce((s,c)=>s+(Number(c.juro_previsto)-Number(c.juro_pago)),0);
+  let html=`
+    <div class="rua">
+      <div class="lbl">Na rua agora</div>
+      <div class="val num">${money(totalNaRua())}</div>
+      <div class="sub num">Recebido no mês: ${money(recebidoMes())}</div>
+    </div>
+    <div class="mrow">
+      <div class="mini red"><div class="t">Atrasados</div><div class="n num">${money(somaAtras)}</div></div>
+      <div class="mini amber"><div class="t">Vence hoje</div><div class="n num">${money(somaHoje)}</div></div>
+    </div>
+    <div class="sec-t">Quem me deve</div>`;
+  const ativos=state.clientes.filter(c=>loansOf(c.id).some(e=>e.status==="ativo"));
+  if(ativos.length===0){ html+=`<div class="list"><div class="empty">Ninguém devendo ainda.<br>Toque em “Emprestei” pra começar.</div></div>`; }
+  else {
+    html+=`<div class="list">`;
+    for(const c of ativos){
+      const cAtras=state.ciclos.some(ci=>ci.status==="atrasado" && loansOf(c.id).some(e=>e.id===ci.emprestimo_id));
+      const cHoje=state.ciclos.some(ci=>ci.status!=="pago" && ci.vencimento===todayISO() && loansOf(c.id).some(e=>e.id===ci.emprestimo_id));
+      const pill = cAtras?`<span class="pill red">Atrasado</span>`:cHoje?`<span class="pill amber">Vence hoje</span>`:`<span class="pill ok">Em dia</span>`;
+      html+=`<button class="row" onclick="go('cliente','${c.id}')">
+        <div class="ava">${initials(c.nome)}</div>
+        <div><div class="nm">${esc(c.nome)}</div><div class="meta">${c.telefone?esc(c.telefone):"sem telefone"}</div></div>
+        <div class="amt"><div class="v num">${money(saldoCliente(c.id))}</div>${pill}</div>
+      </button>`;
+    }
+    html+=`</div>`;
+  }
+  scr.innerHTML=html;
+  fab.innerHTML=`<button class="btn gold" onclick="go('novo')">＋ Emprestei</button>`;
+}
+
+// ---------- NOVO EMPRÉSTIMO ----------
+function renderNovo(scr,fab){
+  const opts=state.clientes.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join("");
+  scr.innerHTML=`
+    <div class="field"><label>Pessoa</label>
+      <select id="f-cliente"><option value="">— Novo cliente —</option>${opts}</select>
+    </div>
+    <div id="f-novoc">
+      <div class="field"><label>Nome do novo cliente</label><input id="f-nome" placeholder="Ex: Maria"></div>
+      <div class="field"><label>Telefone (opcional)</label><input id="f-tel" inputmode="numeric" placeholder="Ex: 51 9..."></div>
+    </div>
+    <div class="field"><label>Valor emprestado (principal)</label><input id="f-principal" inputmode="decimal" placeholder="Ex: 500"></div>
+    <div class="field"><label>Juro por período (R$)</label><input id="f-juro" inputmode="decimal" placeholder="Ex: 150"></div>
+    <div class="field"><label>Período em dias</label><input id="f-periodo" inputmode="numeric" value="15">
+      <div class="hint">De quantos em quantos dias entra o juro (ajuste por cliente).</div>
+    </div>
+    <div class="result" id="f-result"></div>`;
+  const sel=$("f-cliente"), nc=$("f-novoc");
+  sel.onchange=()=>{ nc.classList.toggle("hide", sel.value!==""); };
+  const upd=()=>{ const p=Number($("f-principal").value||0), j=Number($("f-juro").value||0), d=Number($("f-periodo").value||15);
+    $("f-result").textContent = p>0&&j>0 ? `${money(p)} na rua · juro de ${money(j)} a cada ${d} dias` : "Preencha o valor e o juro."; };
+  ["f-principal","f-juro","f-periodo"].forEach(i=>$(i).addEventListener("input",upd)); upd();
+  fab.innerHTML=`<button class="btn gold" id="f-salvar">Confirmar empréstimo</button>`;
+  $("f-salvar").onclick=salvarEmprestimo;
+}
+async function salvarEmprestimo(){
+  const sel=$("f-cliente").value;
+  const principal=Number($("f-principal").value||0), juro=Number($("f-juro").value||0), periodo=Number($("f-periodo").value||15);
+  if(!(principal>0)||!(juro>0)||!(periodo>0)){ toast("Preencha valor, juro e período."); return; }
+  let clienteId=sel;
+  if(!clienteId){
+    const nome=($("f-nome").value||"").trim(); if(!nome){ toast("Digite o nome do cliente."); return; }
+    const { data, error }=await sb.from("clientes").insert({ nome, telefone:($("f-tel").value||"").trim()||null }).select().single();
+    if(error){ toast("Erro ao criar cliente."); return; } clienteId=data.id;
+  }
+  const { data:emp, error }=await sb.from("emprestimos").insert({
+    cliente_id:clienteId, principal, juro_valor:juro, periodo_dias:periodo, data_inicio:todayISO(), status:"ativo"
+  }).select().single();
+  if(error){ toast("Erro ao salvar empréstimo."); return; }
+  await sb.from("ciclos").insert({ emprestimo_id:emp.id, numero:1, vencimento:addDays(todayISO(),periodo), juro_previsto:juro, status:"aberto" });
+  await loadData();
+  toast("Empréstimo lançado!"); go("cliente", clienteId);
+}
+
+// ---------- FICHA DO CLIENTE ----------
+function renderCliente(scr,fab){
+  const c=state.clientes.find(x=>x.id===state.sel); if(!c){ go("home"); return; }
+  const loans=loansOf(c.id).sort((a,b)=>(a.status<b.status?-1:1));
+  let html=`<div style="display:flex; align-items:center; gap:12px; margin-bottom:6px">
+      <div class="ava" style="width:46px;height:46px;font-size:18px">${initials(c.nome)}</div>
+      <div><div style="font-weight:800;font-size:19px">${esc(c.nome)}</div>
+      <div style="font-size:13px;color:var(--soft)">${c.telefone?esc(c.telefone):"sem telefone"}</div></div>
+    </div>`;
+  if(loans.length===0) html+=`<div class="list"><div class="empty">Nenhum empréstimo.</div></div>`;
+  for(const e of loans){
+    const abertos=jurosAbertosEmp(e.id);
+    const saldo = e.status==="ativo" ? Number(e.principal)+abertos : 0;
+    html+=`<div class="sec-t">Empréstimo · ${e.status==="quitado"?"QUITADO":money(e.principal)+" na rua"}</div>
+      <div class="list" style="padding:14px 15px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--soft)">
+          <span>Juro ${money(empJuro(e))} a cada ${e.periodo_dias} dias</span>
+          <span>Desde ${fmtBR(e.data_inicio)}</span>
+        </div>`;
+    if(e.status==="ativo"){
+      html+=`<div style="margin:10px 0 4px;font-weight:800;font-size:15px">Deve agora: <span class="num">${money(saldo)}</span></div>`;
+      const cs=ciclosOf(e.id);
+      for(const ci of cs){
+        const paid=ci.status==="pago", late=ci.status==="atrasado";
+        const ic = paid?`<div class="ic ok">✓</div>`: late?`<div class="ic red">!</div>`:`<div class="ic amber">•</div>`;
+        const lbl = paid?"Pago":late?"Atrasado":"Em aberto";
+        html+=`<div class="ciclo">${ic}
+          <div class="cl"><div class="ck">Juro ${ci.numero}</div><div class="cd">${lbl} · vence ${fmtBR(ci.vencimento)}</div></div>
+          <div class="cv num">${money(ci.juro_previsto)}</div>
+          ${paid?"":`<button class="mini-btn" onclick="receberJuro('${ci.id}')">Recebi</button>`}
+        </div>`;
+      }
+      html+=`<div style="margin-top:14px"></div>`;
+    }
+    html+=`</div>`;
+    if(e.status==="ativo"){
+      html+=`<div style="margin-top:10px"><button class="btn ghost" onclick="receberPrincipal('${e.id}')">Recebi de volta o dinheiro (abater/quitar)</button></div>`;
+    }
+  }
+  scr.innerHTML=html;
+}
+async function receberJuro(cicloId){
+  const ci=state.ciclos.find(c=>c.id===cicloId); if(!ci) return;
+  await sb.from("ciclos").update({ juro_pago:ci.juro_previsto, status:"pago", pago_em:todayISO() }).eq("id",cicloId);
+  await sb.from("pagamentos").insert({ emprestimo_id:ci.emprestimo_id, ciclo_id:cicloId, valor:ci.juro_previsto, tipo:"juro", data:todayISO() });
+  await loadData(); toast("Juro recebido."); render();
+}
+async function receberPrincipal(empId){
+  const e=state.emprestimos.find(x=>x.id===empId); if(!e) return;
+  const v=prompt(`Quanto do principal você recebeu? (deve ${money(e.principal)})`, String(e.principal));
+  if(v===null) return;
+  const val=Number(String(v).replace(",","."));
+  if(!(val>0)){ toast("Valor inválido."); return; }
+  const novo=Math.max(0, Number(e.principal)-val);
+  const quitou = novo<=0;
+  await sb.from("emprestimos").update({ principal:novo, status: quitou?"quitado":"ativo" }).eq("id",empId);
+  await sb.from("pagamentos").insert({ emprestimo_id:empId, valor:val, tipo: quitou?"quitacao":"principal", data:todayISO() });
+  await loadData(); toast(quitou?"Empréstimo quitado!":"Principal abatido.");
+  if(quitou) go("home"); else render();
+}
+
+// ---------- CONFIG ----------
+function renderConfig(scr,fab){
+  const cfg=state.cfg||{};
+  scr.innerHTML=`
+    <div class="field"><label>WhatsApp que recebe os lembretes</label>
+      <input id="c-tel" inputmode="numeric" value="${cfg.telefone_aviso||""}" placeholder="Ex: 5551980465127">
+      <div class="hint">Só você recebe o resumo diário. O cliente nunca é avisado pelo app.</div>
+    </div>
+    <div class="field"><label>Hora do aviso</label><input id="c-hora" type="time" value="${(cfg.hora_aviso||'08:00').slice(0,5)}"></div>
+    <div style="margin-top:22px"><button class="btn danger" id="c-sair">Sair da conta</button></div>`;
+  fab.innerHTML=`<button class="btn pine" id="c-salvar">Salvar ajustes</button>`;
+  $("c-salvar").onclick=async()=>{
+    await sb.from("config").upsert({ id:1, telefone_aviso:$("c-tel").value.trim()||null, hora_aviso:$("c-hora").value+":00" });
+    await loadCfg(); toast("Salvo."); go("home");
+  };
+  $("c-sair").onclick=async()=>{ await sb.auth.signOut(); location.reload(); };
+}
+async function loadCfg(){ const { data }=await sb.from("config").select("*").eq("id",1).maybeSingle(); state.cfg=data||{}; }
+
+// ---------- util ----------
+function esc(s){ return String(s||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
+window.go=go; window.receberJuro=receberJuro; window.receberPrincipal=receberPrincipal;
+
+$("lg-btn").onclick=doLogin;
+$("lg-pass").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
+boot();
+</script>
+</body>
+</html>
