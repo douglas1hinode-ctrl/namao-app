@@ -230,6 +230,7 @@ $("btn-back").onclick=()=>go("home");
 $("btn-config").onclick=()=>go("config");
 
 function render(){
+  if(state.waPoll && state.view!=="config"){ clearInterval(state.waPoll); state.waPoll=null; }
   const back=$("btn-back"), title=$("top-title"), fab=$("fabbar"), scr=$("screen");
   fab.innerHTML=""; scr.scrollTop=0;
   const atHome = state.view==="home";
@@ -425,9 +426,14 @@ async function salvarEdicao(empId, clienteId){
 function renderConfig(scr,fab){
   const cfg=state.cfg||{};
   scr.innerHTML=`
-    <div class="field"><label>WhatsApp que recebe os lembretes</label>
+    <div class="field"><label>Avisos no seu WhatsApp</label>
+      <div id="wa-status" class="hint" style="margin-bottom:8px">Conecte seu WhatsApp pra receber o resumo diário aqui — de você pra você.</div>
+      <div id="wa-qr" style="text-align:center"></div>
+      <button class="btn ghost" id="wa-btn">Conectar meu WhatsApp</button>
+    </div>
+    <div class="field"><label>Número que recebe o aviso</label>
       <input id="c-tel" inputmode="numeric" value="${cfg.telefone_aviso||""}" placeholder="Ex: 5551980465127">
-      <div class="hint">Só você recebe o resumo diário. O cliente nunca é avisado pelo app.</div>
+      <div class="hint">O seu WhatsApp (pra onde o resumo chega). O cliente nunca é avisado pelo app.</div>
     </div>
     <div class="field"><label>Hora do aviso</label><input id="c-hora" type="time" value="${(cfg.hora_aviso||'08:00').slice(0,5)}"></div>
     <div style="margin-top:22px"><button class="btn danger" id="c-sair">Sair da conta</button></div>`;
@@ -437,6 +443,30 @@ function renderConfig(scr,fab){
     await loadCfg(); toast("Salvo."); go("home");
   };
   $("c-sair").onclick=async()=>{ await sb.auth.signOut(); location.reload(); };
+  $("wa-btn").onclick=()=>waRefresh(true);
+  waRefresh(false);
+}
+async function waRefresh(showQr){
+  if(!$("wa-status")) return;
+  try{
+    const { data }=await sb.functions.invoke("wa-conectar");
+    if(!$("wa-status")) return;
+    if(data && data.connected){
+      $("wa-qr").innerHTML=""; $("wa-status").innerHTML="✅ <b>Conectado!</b> O resumo diário chega aqui no seu WhatsApp.";
+      $("wa-btn").classList.add("hide");
+      if(state.waPoll){ clearInterval(state.waPoll); state.waPoll=null; }
+      return;
+    }
+    if(showQr && data && data.qr){
+      $("wa-qr").innerHTML=`<img src="${data.qr}" alt="QR" style="width:230px;max-width:82%;border:7px solid #fff;border-radius:12px;margin-bottom:10px">`;
+      $("wa-status").innerHTML="No seu WhatsApp: <b>Ajustes → Aparelhos conectados → Conectar um aparelho</b> e aponte a câmera pro QR acima.";
+      $("wa-btn").textContent="Gerar outro QR";
+      if(state.waPoll) clearInterval(state.waPoll);
+      state.waPoll=setInterval(()=>waRefresh(true), 4500);
+    } else if(showQr){
+      $("wa-status").textContent="Não consegui gerar o QR agora. Toca de novo.";
+    }
+  }catch(e){ if($("wa-status")&&showQr) $("wa-status").textContent="Erro de conexão. Tenta de novo."; }
 }
 async function loadCfg(){ const { data }=await sb.from("config").select("*").eq("id",1).maybeSingle(); state.cfg=data||{}; }
 
