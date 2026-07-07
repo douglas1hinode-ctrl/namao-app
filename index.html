@@ -241,9 +241,10 @@ function render(){
   else if(state.view==="novo") renderNovo(scr,fab);
   else if(state.view==="cliente") renderCliente(scr,fab);
   else if(state.view==="editar") renderEditar(scr,fab);
+  else if(state.view==="pessoa") renderPessoa(scr,fab);
   else if(state.view==="config") renderConfig(scr,fab);
 }
-function titleFor(v){ return v==="novo"?"Novo empréstimo":v==="cliente"?"Ficha":v==="editar"?"Editar empréstimo":v==="config"?"Ajustes":""; }
+function titleFor(v){ return v==="novo"?"Novo empréstimo":v==="cliente"?"Ficha":v==="editar"?"Editar empréstimo":v==="pessoa"?"Editar pessoa":v==="config"?"Ajustes":""; }
 
 // ---------- HOME ----------
 function renderHome(scr,fab){
@@ -337,41 +338,57 @@ function renderCliente(scr,fab){
   const loans=loansOf(c.id).sort((a,b)=>(a.status<b.status?-1:1));
   let html=`<div style="display:flex; align-items:center; gap:12px; margin-bottom:6px">
       <div class="ava" style="width:46px;height:46px;font-size:18px">${initials(c.nome)}</div>
-      <div><div style="font-weight:800;font-size:19px">${esc(c.nome)}</div>
+      <div style="flex:1"><div style="font-weight:800;font-size:19px">${esc(c.nome)}</div>
       <div style="font-size:13px;color:var(--soft)">${c.telefone?esc(c.telefone):"sem telefone"}</div></div>
+      <button class="icobtn" style="background:#e7ecdf;color:#3f6b4f" onclick="editarPessoa('${c.id}')" title="Editar pessoa">✎</button>
     </div>`;
   if(loans.length===0) html+=`<div class="list"><div class="empty">Nenhum empréstimo.</div></div>`;
   for(const e of loans){
+    const ativo = e.status==="ativo";
     const abertos=jurosAbertosEmp(e.id);
-    const saldo = e.status==="ativo" ? Number(e.principal)+abertos : 0;
-    html+=`<div class="sec-t">Empréstimo · ${e.status==="quitado"?"QUITADO":money(e.principal)+" na rua"}</div>
+    const saldo = ativo ? Number(e.principal)+abertos : 0;
+    html+=`<div class="sec-t">Empréstimo · ${ativo?money(e.principal)+" na rua":"QUITADO"}</div>
       <div class="list" style="padding:14px 15px">
         <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--soft)">
           <span>Juro ${money(empJuro(e))} a cada ${e.periodo_dias} dias</span>
           <span>Desde ${fmtBR(e.data_inicio)}</span>
         </div>`;
-    if(e.status==="ativo"){
+    if(ativo){
       html+=`<div style="margin:10px 0 4px;font-weight:800;font-size:15px">Deve agora: <span class="num">${money(saldo)}</span></div>`;
-      const cs=ciclosOf(e.id);
-      for(const ci of cs){
+      for(const ci of ciclosOf(e.id)){
         const paid=ci.status==="pago", late=ci.status==="atrasado";
         const ic = paid?`<div class="ic ok">✓</div>`: late?`<div class="ic red">!</div>`:`<div class="ic amber">•</div>`;
         const lbl = paid?"Pago":late?"Atrasado":"Em aberto";
         html+=`<div class="ciclo">${ic}
           <div class="cl"><div class="ck">Juro ${ci.numero}</div><div class="cd">${lbl} · vence ${fmtBR(ci.vencimento)}</div></div>
           <div class="cv num">${money(ci.juro_previsto)}</div>
-          ${paid?"":`<button class="mini-btn" onclick="receberJuro('${ci.id}')">Recebi</button>`}
+          ${paid?`<button class="mini-btn" style="background:#eee;color:#a32e1e" onclick="estornarJuro('${ci.id}')">Desfazer</button>`
+                :`<button class="mini-btn" onclick="receberJuro('${ci.id}')">Recebi</button>`}
         </div>`;
       }
-      html+=`<div style="margin-top:14px"></div>`;
+    }
+    // histórico de recebimentos deste empréstimo
+    const pags=state.pagamentos.filter(p=>p.emprestimo_id===e.id).sort((a,b)=>String(a.criado_em)>String(b.criado_em)?1:-1);
+    if(pags.length){
+      html+=`<div style="margin-top:12px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft)">Recebimentos</div>`;
+      for(const p of pags){
+        const tl = p.tipo==="juro"?"Juro":p.tipo==="principal"?"Abateu principal":"Quitação";
+        html+=`<div class="ciclo">
+          <div class="cl"><div class="ck">${tl}</div><div class="cd">${fmtBR(p.data)} · <button onclick="editarDataPagamento('${p.id}')" style="background:none;border:none;color:var(--pine);font-weight:700;padding:0;font-size:12px;text-decoration:underline">mudar data</button></div></div>
+          <div class="cv num">${money(p.valor)}</div>
+          <button class="mini-btn" style="background:#eee;color:#a32e1e" onclick="estornarPagamento('${p.id}')">Desfazer</button>
+        </div>`;
+      }
     }
     html+=`</div>`;
-    if(e.status==="ativo"){
-      html+=`<div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
-        <button class="btn ghost" style="flex:1 1 140px" onclick="receberPrincipal('${e.id}')">Recebi o dinheiro (quitar)</button>
-        <button class="btn ghost" style="flex:1 1 100px" onclick="editarEmprestimo('${e.id}')">Editar</button>
-      </div>`;
+    html+=`<div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">`;
+    if(ativo){
+      html+=`<button class="btn ghost" style="flex:2 1 140px" onclick="receberPrincipal('${e.id}')">Recebi o dinheiro (quitar)</button>
+        <button class="btn ghost" style="flex:1 1 70px" onclick="editarEmprestimo('${e.id}')">Editar</button>`;
+    } else {
+      html+=`<button class="btn ghost" style="flex:2 1 140px" onclick="reabrirEmprestimo('${e.id}')">Reabrir empréstimo</button>`;
     }
+    html+=`<button class="btn danger" style="flex:1 1 70px" onclick="apagarEmprestimo('${e.id}')">Apagar</button></div>`;
   }
   scr.innerHTML=html;
 }
@@ -395,13 +412,104 @@ async function receberPrincipal(empId){
   if(quitou) go("home"); else render();
 }
 
+// ---------- CORREÇÕES (desfazer / apagar) ----------
+async function estornarJuro(cicloId){
+  const ci=state.ciclos.find(c=>c.id===cicloId); if(!ci) return;
+  if(!confirm("Desfazer este recebimento de juro? O juro volta a ficar em aberto.")) return;
+  const novo = ci.vencimento < todayISO() ? "atrasado" : "aberto";
+  const u=await sb.from("ciclos").update({ juro_pago:0, status:novo, pago_em:null }).eq("id",cicloId);
+  if(u.error){ toast("Erro: "+(u.error.message||"")); return; }
+  await sb.from("pagamentos").delete().eq("ciclo_id",cicloId).eq("tipo","juro");
+  await loadData(); toast("Recebimento desfeito."); render();
+}
+async function estornarPagamento(pagId){
+  const p=state.pagamentos.find(x=>x.id===pagId); if(!p) return;
+  if(p.tipo==="juro"){ if(p.ciclo_id) return estornarJuro(p.ciclo_id); }
+  if(!confirm(`Desfazer o recebimento de ${money(p.valor)}? O valor volta pro saldo devedor.`)) return;
+  const e=state.emprestimos.find(x=>x.id===p.emprestimo_id);
+  if(e){
+    const u=await sb.from("emprestimos").update({ principal:Number(e.principal)+Number(p.valor), status:"ativo" }).eq("id",e.id);
+    if(u.error){ toast("Erro: "+(u.error.message||"")); return; }
+  }
+  await sb.from("pagamentos").delete().eq("id",pagId);
+  await loadData(); toast("Recebimento desfeito."); render();
+}
+async function editarDataPagamento(pagId){
+  const p=state.pagamentos.find(x=>x.id===pagId); if(!p) return;
+  const nova=prompt("Data do recebimento (formato AAAA-MM-DD):", p.data);
+  if(nova===null) return;
+  const d=String(nova).trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){ toast("Data inválida. Use AAAA-MM-DD."); return; }
+  const u=await sb.from("pagamentos").update({ data:d }).eq("id",pagId);
+  if(u.error){ toast("Erro: "+(u.error.message||"")); return; }
+  await loadData(); toast("Data atualizada."); render();
+}
+async function reabrirEmprestimo(empId){
+  const e=state.emprestimos.find(x=>x.id===empId); if(!e) return;
+  if(!confirm("Reabrir este empréstimo? Ele volta pra 'na rua'.")) return;
+  const quit=state.pagamentos.filter(p=>p.emprestimo_id===empId && p.tipo==="quitacao").sort((a,b)=>String(a.criado_em)<String(b.criado_em)?1:-1);
+  if(quit.length){
+    const p=quit[0];
+    const u=await sb.from("emprestimos").update({ principal:Number(e.principal)+Number(p.valor), status:"ativo" }).eq("id",empId);
+    if(u.error){ toast("Erro: "+(u.error.message||"")); return; }
+    await sb.from("pagamentos").delete().eq("id",p.id);
+  } else {
+    const u=await sb.from("emprestimos").update({ status:"ativo" }).eq("id",empId);
+    if(u.error){ toast("Erro: "+(u.error.message||"")); return; }
+  }
+  await loadData(); toast("Empréstimo reaberto."); render();
+}
+async function apagarEmprestimo(empId){
+  const e=state.emprestimos.find(x=>x.id===empId); if(!e) return;
+  if(!confirm("APAGAR este empréstimo e TODO o histórico dele (juros e recebimentos)? Isso não volta.")) return;
+  await sb.from("pagamentos").delete().eq("emprestimo_id",empId);
+  await sb.from("ciclos").delete().eq("emprestimo_id",empId);
+  const u=await sb.from("emprestimos").delete().eq("id",empId);
+  if(u.error){ toast("Erro ao apagar: "+(u.error.message||"")); return; }
+  await loadData(); toast("Empréstimo apagado."); render();
+}
+
+// ---------- EDITAR PESSOA ----------
+function editarPessoa(clienteId){ state.pessoaId=clienteId; go("pessoa"); }
+function renderPessoa(scr,fab){
+  const c=state.clientes.find(x=>x.id===state.pessoaId); if(!c){ go("home"); return; }
+  const temLoans = loansOf(c.id).length>0;
+  scr.innerHTML=`
+    <div class="field"><label>Nome</label><input id="p-nome" value="${esc(c.nome)}"></div>
+    <div class="field"><label>Telefone (opcional)</label><input id="p-tel" inputmode="numeric" value="${c.telefone?esc(c.telefone):''}" placeholder="Ex: 51 9..."></div>
+    <div class="field"><label>Observação (opcional)</label><input id="p-obs" value="${c.observacao?esc(c.observacao):''}" placeholder="Uma anotação sua"></div>
+    ${temLoans
+      ? `<div class="hint" style="margin-top:16px">Pra apagar esta pessoa, primeiro apague os empréstimos dela.</div>`
+      : `<div style="margin-top:20px"><button class="btn danger" id="p-apagar">Apagar esta pessoa</button></div>`}`;
+  fab.innerHTML=`<button class="btn gold" id="p-salvar">Salvar</button>`;
+  $("p-salvar").onclick=salvarPessoa;
+  if(!temLoans) $("p-apagar").onclick=apagarPessoa;
+}
+async function salvarPessoa(){
+  const c=state.clientes.find(x=>x.id===state.pessoaId); if(!c) return;
+  const nome=($("p-nome").value||"").trim(); if(!nome){ toast("Digite o nome."); return; }
+  const { error }=await sb.from("clientes").update({ nome, telefone:($("p-tel").value||"").trim()||null, observacao:($("p-obs").value||"").trim()||null }).eq("id",c.id);
+  if(error){ toast("Erro ao salvar: "+(error.message||"")); return; }
+  await loadData(); toast("Pessoa atualizada."); go("cliente", c.id);
+}
+async function apagarPessoa(){
+  const c=state.clientes.find(x=>x.id===state.pessoaId); if(!c) return;
+  if(loansOf(c.id).length){ toast("Essa pessoa ainda tem empréstimos."); return; }
+  if(!confirm(`Apagar ${c.nome}? Isso não volta.`)) return;
+  const u=await sb.from("clientes").delete().eq("id",c.id);
+  if(u.error){ toast("Erro ao apagar: "+(u.error.message||"")); return; }
+  await loadData(); toast("Pessoa apagada."); go("home");
+}
+
 // ---------- EDITAR EMPRÉSTIMO ----------
 function editarEmprestimo(empId){ state.editId=empId; go("editar"); }
 function renderEditar(scr,fab){
   const e=state.emprestimos.find(x=>x.id===state.editId); if(!e){ go("home"); return; }
-  const cli=state.clientes.find(c=>c.id===e.cliente_id);
+  const opts=state.clientes.map(cl=>`<option value="${cl.id}" ${cl.id===e.cliente_id?"selected":""}>${esc(cl.nome)}</option>`).join("");
   scr.innerHTML=`
-    <div style="font-size:13px;color:var(--soft);margin-bottom:8px">Empréstimo de <b style="color:var(--ink)">${esc(cli?cli.nome:"")}</b></div>
+    <div class="field"><label>Pessoa</label><select id="e-cliente">${opts}</select>
+      <div class="hint">Trocar aqui move o empréstimo (e todo o histórico) pra outra pessoa.</div>
+    </div>
     <div class="field"><label>Valor emprestado (principal)</label><input id="e-principal" inputmode="decimal" value="${e.principal}"></div>
     <div class="field"><label>Juro por período (R$)</label><input id="e-juro" inputmode="decimal" value="${empJuro(e)}"></div>
     <div class="field"><label>Período em dias</label><input id="e-periodo" inputmode="numeric" value="${e.periodo_dias}"></div>
@@ -410,12 +518,14 @@ function renderEditar(scr,fab){
     </div>
     <div class="hint" style="margin-top:10px">Ao salvar, os juros ainda não pagos são recalculados com os novos valores. Os que já foram pagos ficam como estão.</div>`;
   fab.innerHTML=`<button class="btn gold" id="e-salvar">Salvar alterações</button>`;
-  $("e-salvar").onclick=()=>salvarEdicao(e.id, e.cliente_id);
+  $("e-salvar").onclick=()=>salvarEdicao(e.id);
 }
-async function salvarEdicao(empId, clienteId){
+async function salvarEdicao(empId){
+  const clienteId=$("e-cliente").value;
   const principal=parseNum($("e-principal").value), juro=parseNum($("e-juro").value), periodo=Math.round(parseNum($("e-periodo").value)), data=$("e-data").value||todayISO();
+  if(!clienteId){ toast("Escolha a pessoa."); return; }
   if(!(principal>0)||!(juro>0)||!(periodo>0)){ toast("Preencha valor, juro e período."); return; }
-  const { error }=await sb.from("emprestimos").update({ principal, juro_valor:juro, juro_percent:null, periodo_dias:periodo, data_inicio:data }).eq("id",empId);
+  const { error }=await sb.from("emprestimos").update({ cliente_id:clienteId, principal, juro_valor:juro, juro_percent:null, periodo_dias:periodo, data_inicio:data }).eq("id",empId);
   if(error){ toast("Erro ao salvar: "+(error.message||"")); return; }
   await sb.from("ciclos").delete().eq("emprestimo_id",empId).neq("status","pago");
   await loadData(); await ensureCiclos(); await loadData();
@@ -473,6 +583,8 @@ async function loadCfg(){ const { data }=await sb.from("config").select("*").eq(
 // ---------- util ----------
 function esc(s){ return String(s||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
 window.go=go; window.receberJuro=receberJuro; window.receberPrincipal=receberPrincipal; window.editarEmprestimo=editarEmprestimo;
+window.estornarJuro=estornarJuro; window.estornarPagamento=estornarPagamento; window.editarDataPagamento=editarDataPagamento;
+window.apagarEmprestimo=apagarEmprestimo; window.reabrirEmprestimo=reabrirEmprestimo; window.editarPessoa=editarPessoa;
 
 $("lg-btn").onclick=doLogin;
 $("lg-pass").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
